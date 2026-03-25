@@ -168,8 +168,11 @@ async function enviarPedido(telefone, pedido) {
 
 // ── Processar mensagem recebida ───────────────────────────────
 async function processarMensagem(telefone, texto) {
+  console.log(`🔄 Processando mensagem de [${telefone}]: "${texto}"`);
   try {
+    console.log(`🤖 Chamando Claude API para [${telefone}]...`);
     const resposta = await chamarClaude(telefone, texto);
+    console.log(`✅ Resposta do Claude: ${resposta.substring(0, 100)}...`);
 
     // Verifica se a IA gerou um JSON de pedido
     const jsonMatch = resposta.match(/\{[^{}]*"acao"\s*:\s*"pedido"[^{}]*\}/);
@@ -186,10 +189,13 @@ async function processarMensagem(telefone, texto) {
     }
 
     // Resposta normal da IA
+    console.log(`📤 Enviando resposta para [${telefone}]...`);
     await enviarMensagem(telefone, resposta);
+    console.log(`✅ Mensagem enviada com sucesso para [${telefone}]`);
 
   } catch (erro) {
     console.error(`❌ Erro ao processar [${telefone}]:`, erro.message);
+    console.error(`❌ Stack trace:`, erro.stack);
     try {
       await enviarMensagem(
         telefone,
@@ -226,8 +232,8 @@ app.post("/webhook", async (req, res) => {
 
     console.log(`📩 [${telefone}]: ${texto}`);
 
-    // Processa de forma assíncrona
-    processarMensagem(telefone, texto);
+    // Processa aguardando a conclusão
+    await processarMensagem(telefone, texto);
 
   } catch (erro) {
     console.error("❌ Erro no webhook:", erro.message);
@@ -248,5 +254,6 @@ app.get("/", (req, res) => {
 app.listen(PORT, () => {
   console.log(`\n🚀 AutoPeças IA iniciado na porta ${PORT}`);
   console.log(`📡 Webhook URL: /webhook`);
-  console.log(`🔧 Z-API Instance: ${ZAPI_INSTANCE_ID || "não configurado"}\n`);
+  console.log(`🔧 Z-API Instance: ${ZAPI_INSTANCE_ID || "não configurado"}`);
+  console.log(`🔑 ANTHROPIC_API_KEY presente: ${!!ANTHROPIC_API_KEY}\n`);
 });
