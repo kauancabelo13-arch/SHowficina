@@ -168,11 +168,10 @@ async function enviarPedido(telefone, pedido) {
 
 // ── Processar mensagem recebida ───────────────────────────────
 async function processarMensagem(telefone, texto) {
-  console.log(`🔄 Processando mensagem de [${telefone}]: "${texto}"`);
   try {
-    console.log(`🤖 Chamando Claude API para [${telefone}]...`);
+    console.log(`🤖 Chamando Claude para [${telefone}]...`);
     const resposta = await chamarClaude(telefone, texto);
-    console.log(`✅ Resposta do Claude: ${resposta.substring(0, 100)}...`);
+    console.log(`✅ Claude respondeu: ${resposta.substring(0, 80)}...`);
 
     // Verifica se a IA gerou um JSON de pedido
     const jsonMatch = resposta.match(/\{[^{}]*"acao"\s*:\s*"pedido"[^{}]*\}/);
@@ -180,32 +179,31 @@ async function processarMensagem(telefone, texto) {
     if (jsonMatch) {
       try {
         const pedido = JSON.parse(jsonMatch[0]);
-        console.log(`📤 Enviando resposta para [${telefone}]...`);
         await enviarPedido(telefone, pedido);
-        console.log(`✅ Mensagem enviada com sucesso para [${telefone}]`);
       } catch {
-        // Se falhar ao parsear o JSON, manda a resposta normal
-        console.log(`📤 Enviando resposta para [${telefone}]...`);
         await enviarMensagem(telefone, resposta);
-        console.log(`✅ Mensagem enviada com sucesso para [${telefone}]`);
       }
       return;
     }
 
-    // Resposta normal da IA
-    console.log(`📤 Enviando resposta para [${telefone}]...`);
+    console.log(`📤 Enviando resposta para [${telefone}] via Z-API...`);
     await enviarMensagem(telefone, resposta);
-    console.log(`✅ Mensagem enviada com sucesso para [${telefone}]`);
+    console.log(`✅ Resposta enviada com sucesso para [${telefone}]`);
 
   } catch (erro) {
     console.error(`❌ Erro ao processar [${telefone}]:`, erro.message);
-    console.error(`❌ Stack trace:`, erro.stack);
+    if (erro.response) {
+      console.error(`   Status HTTP: ${erro.response.status}`);
+      console.error(`   Resposta: ${JSON.stringify(erro.response.data)}`);
+    }
     try {
       await enviarMensagem(
         telefone,
         "⚠️ Tive um pequeno problema técnico. Pode repetir sua mensagem?"
       );
-    } catch (_) {}
+    } catch (e2) {
+      console.error(`❌ Falha também ao enviar mensagem de erro:`, e2.message);
+    }
   }
 }
 
@@ -236,8 +234,8 @@ app.post("/webhook", async (req, res) => {
 
     console.log(`📩 [${telefone}]: ${texto}`);
 
-    // Aguarda o processamento completo da mensagem
-    await processarMensagem(telefone, texto);
+    // Processa de forma assíncrona
+    processarMensagem(telefone, texto);
 
   } catch (erro) {
     console.error("❌ Erro no webhook:", erro.message);
@@ -258,7 +256,5 @@ app.get("/", (req, res) => {
 app.listen(PORT, () => {
   console.log(`\n🚀 AutoPeças IA iniciado na porta ${PORT}`);
   console.log(`📡 Webhook URL: /webhook`);
-  console.log(`🔧 Z-API Instance: ${ZAPI_INSTANCE_ID || "não configurado"}`);
-  console.log(`🔑 ANTHROPIC_API_KEY presente: ${!!ANTHROPIC_API_KEY}`);
-  console.log(`📲 Z-API Token presente: ${!!ZAPI_TOKEN}\n`);
+  console.log(`🔧 Z-API Instance: ${ZAPI_INSTANCE_ID || "não configurado"}\n`);
 });
