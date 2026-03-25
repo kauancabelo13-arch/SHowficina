@@ -223,11 +223,16 @@ function resumo(resultados) {
   console.log("║       AutoPeças IA — Diagnóstico de conexões         ║");
   console.log("╚══════════════════════════════════════════════════════╝");
 
+  const variaveis  = testarVariaveis();
+  const claude     = await testarClaude();
+  const zapiStatus = await testarZAPIStatus();
+  const envio      = await testarEnvioMensagem();
+
   const resultados = {
-    variaveis:  testarVariaveis(),
-    claude:     await testarClaude(),
-    zapiStatus: await testarZAPIStatus(),
-    envio:      await testarEnvioMensagem(),
+    variaveis,
+    claude,
+    zapiStatus,
+    envio,
   };
 
   resumo(resultados);
