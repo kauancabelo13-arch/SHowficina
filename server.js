@@ -189,13 +189,26 @@ async function processarMensagem(telefone, texto) {
     await enviarMensagem(telefone, resposta);
 
   } catch (erro) {
-    console.error(`❌ Erro ao processar [${telefone}]:`, erro.message);
+    // Log detalhado para facilitar diagnóstico
+    if (erro.response) {
+      // Erro HTTP de uma API externa (Claude ou Z-API)
+      const origem = erro.config?.url?.includes("anthropic") ? "Claude API" : "Z-API";
+      console.error(`❌ Erro HTTP [${origem}] ao processar [${telefone}]:`, {
+        status: erro.response.status,
+        data: JSON.stringify(erro.response.data),
+      });
+    } else {
+      console.error(`❌ Erro ao processar [${telefone}]:`, erro.message);
+    }
+
     try {
       await enviarMensagem(
         telefone,
         "⚠️ Tive um pequeno problema técnico. Pode repetir sua mensagem?"
       );
-    } catch (_) {}
+    } catch (erroEnvio) {
+      console.error(`❌ Falha ao enviar mensagem de erro para [${telefone}] via Z-API:`, erroEnvio.message);
+    }
   }
 }
 
@@ -226,8 +239,8 @@ app.post("/webhook", async (req, res) => {
 
     console.log(`📩 [${telefone}]: ${texto}`);
 
-    // Processa de forma assíncrona
-    processarMensagem(telefone, texto);
+    // Aguarda o processamento completo antes de retornar
+    await processarMensagem(telefone, texto);
 
   } catch (erro) {
     console.error("❌ Erro no webhook:", erro.message);
@@ -244,9 +257,29 @@ app.get("/", (req, res) => {
   });
 });
 
+// ── Validar variáveis de ambiente obrigatórias ────────────────
+const VARS_OBRIGATORIAS = {
+  ANTHROPIC_API_KEY: "Chave da API do Claude (console.anthropic.com)",
+  ZAPI_INSTANCE_ID:  "Instance ID da Z-API",
+  ZAPI_TOKEN:        "Token da Z-API",
+  ZAPI_CLIENT_TOKEN: "Client Token da Z-API",
+};
+
+const varsFaltando = Object.entries(VARS_OBRIGATORIAS)
+  .filter(([key]) => !process.env[key])
+  .map(([key, desc]) => `  • ${key} — ${desc}`);
+
+if (varsFaltando.length > 0) {
+  console.error("\n🚨 ERRO: Variáveis de ambiente obrigatórias não configuradas:");
+  varsFaltando.forEach((v) => console.error(v));
+  console.error("\nO servidor não irá processar mensagens corretamente sem elas.\n");
+}
+
 // ── Iniciar servidor ──────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`\n🚀 AutoPeças IA iniciado na porta ${PORT}`);
   console.log(`📡 Webhook URL: /webhook`);
-  console.log(`🔧 Z-API Instance: ${ZAPI_INSTANCE_ID || "não configurado"}\n`);
+  console.log(`🔧 Z-API Instance: ${ZAPI_INSTANCE_ID || "não configurado"}`);
+  console.log(`🤖 Claude API Key: ${ANTHROPIC_API_KEY ? "✅ configurada" : "❌ NÃO CONFIGURADA"}`);
+  console.log(`📲 Z-API Token: ${ZAPI_TOKEN ? "✅ configurado" : "❌ NÃO CONFIGURADO"}\n`);
 });
